@@ -62,3 +62,33 @@ class StateManager:
     def reset(self) -> None:
         """Для тестов и полного сброса статистики."""
         self._write(self._default_state())
+    def update(
+        self,
+        job_result: Optional[Dict[str, Any]] = None,
+        active_jobs: int = 0,
+        queue_size: int = 0,
+    ) -> None:
+        data = self._read()
+        
+        if job_result:
+            data["total_processed"] += 1
+            # Защита от отрицательных значений, если backend пришлёт баг
+            saved = max(0, job_result.get("saved_bytes", 0))
+            data["total_saved_bytes"] += saved
+            
+            entry = {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "file": job_result.get("output", "unknown"),
+                "format": job_result.get("format", "unknown"),
+                "saved_bytes": saved,
+                "ratio": job_result.get("ratio", 0.0),
+            }
+            hist = data.get("history", [])
+            hist.append(entry)
+            # Ротация: не более 100 записей, иначе state.json разрастётся
+            data["history"] = hist[-100:]
+        
+        data["active_jobs"] = max(0, active_jobs)
+        data["queue_size"] = max(0, queue_size)
+        data["last_updated"] = datetime.now(timezone.utc).isoformat()
+        self._write(data)
