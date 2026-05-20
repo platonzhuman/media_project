@@ -1,0 +1,18 @@
+# for poisk directory and safe file
+[media]
+watch_dirs = ["./media", "./uploads"]
+output_dir = "./output"
+
+# parametrs szhat img
+[compression.image]
+quality = 85
+formats = ["webp", "avif"]
+
+# parametrs szhat video
+[compression.video]
+codec = "libx264"
+crf = 23
+
+# settings proizvoditelnost
+[workers]
+max_workers = 4
