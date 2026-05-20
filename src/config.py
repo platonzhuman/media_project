@@ -1,6 +1,6 @@
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field
+from pydantic import Field, field_validator
 
 
 class Settings(BaseSettings):
@@ -22,6 +22,15 @@ class Settings(BaseSettings):
     # work potok
     max_workers: int = Field(default=4, ge=1)
 
+    # for poisk directory and safe file
+    @field_validator("watch_dirs", "output_dir", mode="before")
+    @classmethod
+    def _resolve_paths(cls, v):
+        # if list - chacked all 1, 2, 3, 4, 5 ... papcks
+        if isinstance(v, list):
+            return [Path(p).expanduser().resolve() for p in v]
+        # if one, checked one ^_^
+        return Path(v).expanduser().resolve()
 
 def load_settings() -> Settings:
     return Settings()
