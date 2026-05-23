@@ -8,6 +8,7 @@ from pathlib import Path
 import typer
 from rich.console import Console
 from rich.table import Table
+import json
 
 from src.config import load_settings
 from src.state import StateManager
@@ -129,5 +130,23 @@ def config():
     table.add_row("Video CRF", str(s.video_crf))
     table.add_row("Max workers", str(s.max_workers))
     console.print(table)
+
+@app.command()
+def logs(tail: int = typer.Option(20, "--tail", "-n")):
+    """Последние JSON-логи."""
+    log_file = _settings().output_dir / "converter.log"
+    if not log_file.exists():
+        console.print("[yellow]Лог-файл не найден. Логи по умолчанию идут в stdout.[/yellow]")
+        raise typer.Exit(1)
+    lines = [ln for ln in log_file.read_text(encoding="utf-8").split("\n") if ln.strip()]
+    for line in lines[-tail:]:
+        try:
+            obj = json.loads(line)
+            ts, level, msg = obj.get("timestamp", ""), obj.get("level", "INFO"), obj.get("message", line)
+            color = {"ERROR": "red", "WARNING": "yellow", "DEBUG": "dim"}.get(level, "white")
+            console.print(f"[dim]{ts}[/dim] [{color}]{level}[/{color}] {msg}")
+        except json.JSONDecodeError:
+            console.print(line)
+            
 if __name__ == "__main__":
     app()
