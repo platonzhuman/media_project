@@ -1,5 +1,6 @@
 from pathlib import Path
 from PIL import Image
+from concurrent.futures import ThreadPoolExecutor
 
 from src.processors.utils import atomic_replace
 
@@ -10,11 +11,16 @@ class ImageProcessor:
         self.quality = quality
         self.formats = formats or ["webp"]
     
-    def process(self, file_path: Path, output_dir: Path) -> dict:
-        results = {}
-        for fmt in self.formats:
-            results[fmt] = self._convert(file_path, output_dir, fmt)
-        return results
+def process(self, file_path: Path, output_dir: Path) -> dict:
+    results = {}
+    for fmt in self.formats:
+        future = self.executor.submit(self._convert, file_path, output_dir, fmt)
+        results[fmt] = future.result()
+    return results
+
+def shutdown(self):
+    self.executor.shutdown(wait=True)
+
     
 
     def _convert(self, src: Path, output_dir: Path, fmt: str) -> dict:
@@ -22,7 +28,7 @@ class ImageProcessor:
         output_dir.mkdir(parents=True, exist_ok=True)
 
         output_path = output_dir / f"{src.stem}.{fmt}"
-        
+
         tmp = output_dir / f".{src.stem}.{fmt}.tmp"
 
         img = Image.open(src)
