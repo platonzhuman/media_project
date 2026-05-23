@@ -94,7 +94,7 @@ def status():
     except ProcessLookupError:
         console.print("[red]PID мёртв[/red]")
         PID_FILE.unlink(missing_ok=True)
-        
+
 @app.command()
 def stats():
     """Полная статистика."""
@@ -114,5 +114,20 @@ def stats():
         table.add_row("Последнее сжатие", f"{last.get('ratio', 0):.1f}%")
     console.print(table)
 
+@app.command()
+def config():
+    """Текущая конфигурация."""
+    s = _settings()
+    table = Table(title="Configuration", header_style="bold")
+    table.add_column("Параметр", style="cyan")
+    table.add_column("Значение", style="green")
+    table.add_row("Watch dirs", ", ".join(str(d) for d in s.watch_dirs))
+    table.add_row("Output dir", str(s.output_dir))
+    table.add_row("Image quality", str(s.image_quality))
+    table.add_row("Image formats", ", ".join(s.image_formats))
+    table.add_row("Video codec", s.video_codec)
+    table.add_row("Video CRF", str(s.video_crf))
+    table.add_row("Max workers", str(s.max_workers))
+    console.print(table)
 if __name__ == "__main__":
     app()
