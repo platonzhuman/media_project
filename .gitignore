@@ -7,6 +7,20 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+#Project
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+htmlcov/
+.coverage
+output/
+media/
+*.tmp
+.converter_state.json
+
 # C extensions
 *.so
 

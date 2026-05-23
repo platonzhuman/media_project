@@ -7,6 +7,7 @@ from pathlib import Path
 
 import typer
 from rich.console import Console
+from rich.table import Table
 
 from src.config import load_settings
 from src.state import StateManager
@@ -93,7 +94,25 @@ def status():
     except ProcessLookupError:
         console.print("[red]PID мёртв[/red]")
         PID_FILE.unlink(missing_ok=True)
-
+        
+@app.command()
+def stats():
+    """Полная статистика."""
+    data = StateManager().get()
+    table = Table(title="Media Converter Stats", header_style="bold magenta", border_style="blue")
+    table.add_column("Метрика", style="cyan", no_wrap=True)
+    table.add_column("Значение", style="green")
+    table.add_row("Всего обработано", str(data.get("total_processed", 0)))
+    table.add_row("Сэкономлено байт", f"{data.get('total_saved_bytes', 0):,}")
+    table.add_row("Активных задач", str(data.get("active_jobs", 0)))
+    table.add_row("В очереди", str(data.get("queue_size", 0)))
+    table.add_row("Обновлено", data.get("last_updated", "N/A"))
+    history = data.get("history", [])
+    if history:
+        last = history[-1]
+        table.add_row("Последний файл", Path(last.get("file", "N/A")).name)
+        table.add_row("Последнее сжатие", f"{last.get('ratio', 0):.1f}%")
+    console.print(table)
 
 if __name__ == "__main__":
     app()
