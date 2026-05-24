@@ -9,6 +9,9 @@ import typer
 from rich.console import Console
 from rich.table import Table
 import json
+from rich.live import Live
+from rich.layout import Layout
+from rich.panel import Panel
 
 from src.config import load_settings
 from src.state import StateManager
@@ -148,5 +151,48 @@ def logs(tail: int = typer.Option(20, "--tail", "-n")):
         except json.JSONDecodeError:
             console.print(line)
             
+@app.command()
+def watch(interval: float = typer.Option(0.5, "--interval", help="Обновление UI (сек)")):
+    """Интерактивный мониторинг (блокирует терминал)."""
+    proc = subprocess.Popen([sys.executable, "-m", "src.watcher"],
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    state = StateManager()
+    try:
+        with Live(refresh_per_second=4, screen=True) as live:
+            while proc.poll() is None:
+                data = state.get()
+                metrics = Table(show_header=False, box=None)
+                metrics.add_column(style="cyan")
+                metrics.add_column(style="green")
+                metrics.add_row("Обработано", str(data["total_processed"]))
+                metrics.add_row("Сэкономлено", f"{data['total_saved_bytes']:,} байт")
+                metrics.add_row("Активных", str(data["active_jobs"]))
+                metrics.add_row("В очереди", str(data["queue_size"]))
+                hist_table = Table(title="Последние файлы", header_style="bold")
+                hist_table.add_column("Время", style="dim", width=10)
+                hist_table.add_column("Файл", style="white")
+                hist_table.add_column("Сжатие", style="green", justify="right")
+                for entry in data.get("history", [])[-5:]:
+                    hist_table.add_row(entry.get("timestamp", "")[11:19],
+                                       Path(entry.get("file", "")).name,
+                                       f"{entry.get('ratio', 0):.1f}%")
+                layout = Layout()
+                layout.split_column(
+                    Layout(Panel(metrics, title="Media Converter", border_style="blue")),
+                    Layout(Panel(hist_table, border_style="dim")),
+                    Layout("Ctrl+C для остановки", size=1),
+                )
+                live.update(layout)
+                time.sleep(interval)
+        console.print(f"[yellow]Вотчер завершился (код {proc.returncode})[/yellow]")
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Останавливаю...[/yellow]")
+        proc.send_signal(signal.SIGINT)
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+        console.print("[green]Остановлен[/green]")
+        
 if __name__ == "__main__":
     app()
