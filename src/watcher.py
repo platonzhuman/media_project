@@ -6,12 +6,25 @@ from watchdog.observers import Observer
 
 from src.config import Settings
 
+from src.processors.images import ImageProcessor
+from src.processors.video import VideoProcessor
+
 class mediahandler(FileSystemEventHandler):
     def __init__(self, settings: Settings):
         self.settings = settings
         # list formats obrabotka
         self.supported_images = {".jpg", ".jpeg", ".png"}
         self.supported_video = {".mp4", ".mov"}
+
+        # added real proccerors 
+        self.image_processor = ImageProcessor(
+            quality=settings.image_quality,
+            formats=settings.image_formats,
+        )
+        self.video_processor = VideoProcessor(
+            codec=settings.video_codec,
+            crf=settings.video_crf,
+        )
 
     def on_created(self, event):
         # reaction on file only
@@ -20,9 +33,13 @@ class mediahandler(FileSystemEventHandler):
 
     def _process(self, path: str):
         ext = Path(path).suffix.lower()
-        # checked: it is we format or no
-        if ext in self.supported_images or ext in self.supported_video:
-            print(f"[WATCHER] обнаруден файл ^_^ : {path}")
+        # added connect real functional for proceccing 
+        if ext in self.supported_images:
+            res = self.image_processor.process(Path(path), self.settings.output_dir)
+            print(f"[IMG] {res}")
+        elif ext in self.supported_video:
+            res = self.video_processor.process(Path(path), self.settings.output_dir)
+            print(f"[VID] {res}")
 
 # create class for slezki and vovrema stoped 
 class mediawatcher:
