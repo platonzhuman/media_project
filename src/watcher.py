@@ -1,15 +1,20 @@
-from pathlib import Path
-from watchdog.events import FileSystemEventHandler, FileCreatedEvent
-import signal
-import sys
+from pathlib import Path # paths file
+from watchdog.events import FileSystemEventHandler, FileCreatedEvent # sobutia files
 
-import time
-from watchdog.observers import Observer
+import signal # system signal
+import sys # for outpute process
+
+import time # pause range
+from watchdog.observers import Observer # start watcher
 
 from src.config import Settings
+from src.state import StateManager
 
 from src.processors.images import ImageProcessor
 from src.processors.video import VideoProcessor
+
+
+
 
 class mediahandler(FileSystemEventHandler):
     def __init__(self, settings: Settings):
@@ -17,6 +22,8 @@ class mediahandler(FileSystemEventHandler):
         # list formats obrabotka
         self.supported_images = {".jpg", ".jpeg", ".png"}
         self.supported_video = {".mp4", ".mov"}
+        #  now sostoyanie sistem
+        self._state = StateManager()
 
         # added real proccerors 
         self.image_processor = ImageProcessor(
@@ -38,9 +45,14 @@ class mediahandler(FileSystemEventHandler):
         # added connect real functional for proceccing 
         if ext in self.supported_images:
             res = self.image_processor.process(Path(path), self.settings.output_dir)
-            print(f"[IMG] {res}")
+            # because we have slovar
+            first = next(iter(res.values()))
+            # replace result and sostoyanie in real time
+            self._state.update(job_result=first, active_jobs=1, queue_size=0)
+            print(f"[IMG] {first}")
         elif ext in self.supported_video:
             res = self.video_processor.process(Path(path), self.settings.output_dir)
+            self._state.update(job_result=res, active_jobs=1, queue_size=0)
             print(f"[VID] {res}")
 
 # create class for slezki and vovrema stoped 
