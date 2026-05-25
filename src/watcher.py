@@ -1,5 +1,7 @@
 from pathlib import Path
 from watchdog.events import FileSystemEventHandler, FileCreatedEvent
+import signal
+import sys
 
 import time
 from watchdog.observers import Observer
@@ -49,22 +51,28 @@ class mediawatcher:
         self.handler = mediahandler(settings)
 
     def start(self):
-        # for poisk directory and safe file
-        for dir in self.settings.watch_dirs:
-            if dir.exists():
-                self.observer.schedule(self.handler, str(dir), recursive=True)
-                print(f"[WATCHER] мониторинг ^_^ : {dir}")
+        for directory in self.settings.watch_dirs:
+            if directory.exists():
+                self.observer.schedule(self.handler, str(directory), recursive=True)
+                print(f"WWW мониторинг: {directory}")
         self.observer.start()
+        signal.signal(signal.SIGTERM, self._handle_signal)
+        signal.signal(signal.SIGINT, self._handle_signal)
         try:
-            while True:
-                time.sleep(1)
+            while self.observer.is_alive():
+                self.observer.join(1)
         except KeyboardInterrupt:
             self.stop()
+
+    def _handle_signal(self, signum, frame):
+        print(f"\nWWW сигнал {signum}, завершаюсь...")
+        self.stop()
+        sys.exit(0)
 
     def stop(self):
         self.observer.stop()
         self.observer.join()
-        print("[WATCHER] остановлен ^_^")
+        print("WWW остановлен ^_^")
 
 
 if __name__ == "__main__":
