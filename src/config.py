@@ -1,7 +1,7 @@
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, field_validator
-
+import os
 
 class Settings(BaseSettings):
     # uato read settings
@@ -31,6 +31,26 @@ class Settings(BaseSettings):
             return [Path(p).expanduser().resolve() for p in v]
         # if one, checked one ^_^
         return Path(v).expanduser().resolve()
+    
+    # for auto check dirs
+    @field_validator("watch_dirs")
+    @classmethod
+    def _check_access(cls, v: list[Path]):
+        for p in v:
+            if not p.exists():
+                p.mkdir(parents=True, exist_ok=True)
+            if not os.access(p, os.W_OK | os.R_OK):
+                raise ValueError(f"нет прав на папку {p}")
+        return v
+
+    # to avoid beskonechnogo range
+    @field_validator("output_dir")
+    @classmethod
+    def _no_loop(cls, v: Path, info):
+        for w in info.data.get("watch_dirs", []):
+            if v.resolve() == w.resolve() or v.resolve() in w.resolve().parents:
+                raise ValueError("output_dir не может быть внутри watch_dirs")
+        return v
 
 def load_settings() -> Settings:
     return Settings()
