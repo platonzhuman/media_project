@@ -24,6 +24,7 @@ class mediahandler(FileSystemEventHandler):
         self.supported_video = {".mp4", ".mov"}
         #  now sostoyanie sistem
         self._state = StateManager()
+        self._processed = set()   
 
         # added real proccerors 
         self.image_processor = ImageProcessor(
@@ -39,10 +40,18 @@ class mediahandler(FileSystemEventHandler):
         # reaction on file only
         if not event.is_directory:
             self._process(event.src_path)
+    
+    def on_modified(self, event):
+        if not event.is_directory and event.src_path not in self._processed:
+            self._process(event.src_path)
+
 
     def _process(self, path: str):
         ext = Path(path).suffix.lower()
-        # added connect real functional for proceccing 
+        if ext not in self.supported_images and ext not in self.supported_video:
+            return
+        self._processed.add(path)
+        # added connect real functional for proceccing
         if ext in self.supported_images:
             res = self.image_processor.process(Path(path), self.settings.output_dir)
             # because we have slovar
