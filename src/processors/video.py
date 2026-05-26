@@ -1,7 +1,7 @@
 import subprocess
 from pathlib import Path
 
-from src.processors.utils import atomic_replace
+from src.processors import utils
 
 
 class VideoProcessor:
@@ -31,7 +31,7 @@ class VideoProcessor:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
 
         or_size = file_path.stat().st_size
-        atomic_replace(tmp, output_path)
+        utils.atomic_replace(tmp, output_path)
         new_size = output_path.stat().st_size
 
         # outpute info 

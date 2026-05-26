@@ -10,6 +10,7 @@ class ImageProcessor:
     def __init__(self, quality: int = 85, formats: list[str] | None = None):
         self.quality = quality
         self.formats = formats or ["webp"]
+        self.executor = ThreadPoolExecutor(max_workers=4)
 
     def process(self, file_path: Path, output_dir: Path) -> dict:
         results = {}
