@@ -15,10 +15,14 @@ def test_full_image_pipeline(tmp_path: Path, monkeypatch):
     watcher = mediawatcher(Settings(watch_dirs=[media], output_dir=out))
     t = threading.Thread(target=watcher.start, daemon=True)
     t.start()
+    time.sleep(0.3)
+    Image.new("RGB", (50, 50), "blue").save(media / "e2e.jpg", "JPEG")
     deadline = time.time() + 5
     while time.time() < deadline:
         if any(out.glob("*.webp")):
             break
         time.sleep(0.1)
+
     watcher.stop()
+
     assert any(out.glob("*.webp")), "WebP не создан за 5 секунд"
