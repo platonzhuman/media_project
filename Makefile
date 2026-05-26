@@ -1,4 +1,4 @@
-.PHONY: install test lint build run shell
+.PHONY: install test lint build run shell coverage ci
 
 install:
 	pip install -e ".[dev]"
@@ -22,3 +22,10 @@ run:
 
 shell:
 	docker run -it --rm media-converter:latest bash
+
+coverage:
+	pytest --cov=src --cov-report=html --cov-report=term
+	@echo "Отчёт: htmlcov/index.html"
+
+ci: lint test
+	@echo "CI пройден"
