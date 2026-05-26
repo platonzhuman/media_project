@@ -12,7 +12,7 @@ class VideoProcessor:
         self.codec = codec
         self.crf = crf
 
-    def proces(self, file_path: Path, output_dir: Path) -> dict:
+    def process(self, file_path: Path, output_dir: Path) -> dict:
         # create papks if not 
         output_dir.mkdir(parents=True, exist_ok=True)
         # sdelal put i faily vnutri tmp

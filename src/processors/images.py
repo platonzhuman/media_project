@@ -5,21 +5,21 @@ from concurrent.futures import ThreadPoolExecutor
 from src.processors.utils import atomic_replace
 
 class ImageProcessor:
-    SUP_INPUT  = {".jpg", ".jpeg", ".pn"}
+    SUP_INPUT  = {".jpg", ".jpeg", ".png"}
 
     def __init__(self, quality: int = 85, formats: list[str] | None = None):
         self.quality = quality
         self.formats = formats or ["webp"]
-    
-def process(self, file_path: Path, output_dir: Path) -> dict:
-    results = {}
-    for fmt in self.formats:
-        future = self.executor.submit(self._convert, file_path, output_dir, fmt)
-        results[fmt] = future.result()
-    return results
 
-def shutdown(self):
-    self.executor.shutdown(wait=True)
+    def process(self, file_path: Path, output_dir: Path) -> dict:
+        results = {}
+        for fmt in self.formats:
+            future = self.executor.submit(self._convert, file_path, output_dir, fmt)
+            results[fmt] = future.result()
+        return results
+
+    def shutdown(self):
+        self.executor.shutdown(wait=True)
 
     
 
