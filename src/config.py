@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     @classmethod
     def _no_loop(cls, v: Path, info):
         for w in info.data.get("watch_dirs", []):
-            if v.resolve() == w.resolve() or v.resolve() in w.resolve().parents:
+            if v.resolve() == w.resolve() or w.resolve() in v.resolve().parents:
                 raise ValueError("output_dir не может быть внутри watch_dirs")
         return v
 
