@@ -3,24 +3,56 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, field_validator
 import os
 
+# vnutr models
+class _CompressionImage(BaseSettings):
+    quality: int = Field(default=85, ge=1, le=100)
+    formats: list[str] = Field(default=["webp", "avif"])
+
+class _CompressionVideo(BaseSettings):
+    codec: str = Field(default="libx264")
+    crf: int = Field(default=23, ge=0, le=51)
+
+class _Workers(BaseSettings):
+    max_workers: int = Field(default=4, ge=1)
+
 class Settings(BaseSettings):
     # uato read settings
-    model_config = SettingsConfigDict(toml_file="settings.toml")
+    model_config = SettingsConfigDict(
+        toml_file="settings.toml",
+        extra="ignore"  # ignore lishnie keys
+    )
 
     # po umolchanio
     watch_dirs: list[Path] = Field(default=[Path("./media")])
     output_dir: Path = Field(default=Path("./output"))
 
-    # setting for img
-    image_quality: int = Field(default=85, ge=1, le=100)
-    image_formats: list[str] = Field(default=["webp", "avif"])
+    # input section
+    compression_image: _CompressionImage = Field(default_factory=_CompressionImage)
+    compression_video: _CompressionVideo = Field(default_factory=_CompressionVideo)
+    workers_config: _Workers = Field(default_factory=_Workers)
 
-    # settings for video
-    video_codec: str = Field(default="libx264")
-    video_crf: int = Field(default=23, ge=0, le=51)
+    # setting for img 
+    @property
+    def image_quality(self) -> int:
+        return self.compression_image.quality
 
-    # work potok
-    max_workers: int = Field(default=4, ge=1)
+    @property
+    def image_formats(self) -> list[str]:
+        return self.compression_image.formats
+
+    # settings for video 
+    @property
+    def video_codec(self) -> str:
+        return self.compression_video.codec
+
+    @property
+    def video_crf(self) -> int:
+        return self.compression_video.crf
+
+    # work potok 
+    @property
+    def max_workers(self) -> int:
+        return self.workers_config.max_workers
 
     # for poisk directory and safe file
     @field_validator("watch_dirs", "output_dir", mode="before")
