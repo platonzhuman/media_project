@@ -15,8 +15,13 @@ class StateManager:
     def __init__(
         self, state_path: Optional[Path] = None, settings: Optional[Settings] = None
     ):
-        self._settings = settings or load_settings()
-        self._path = state_path or (self._settings.output_dir / ".converter_state.json")
+        if state_path is not None and settings is None:
+            self._settings = None
+            self._path = state_path
+        else:
+            self._settings = settings or load_settings()
+            self._path = state_path or (self._settings.output_dir / ".converter_state.json")
+        
         self._path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = Lock()
         if not self._path.exists():
