@@ -1,34 +1,38 @@
 SHELL := /bin/bash
 
 .PHONY: help setup install test test-smoke test-unit test-integration coverage \
-        lint build run shell check clean compose-up compose-down
+        lint build build-lib publish-lib install-lib-local docs \
+		run shell check clean compose-up compose-down lock 
 
 help:
-	@echo "Доступные команды:"
-	@echo "  setup       Подготовка окружения"
-	@echo "  install     Установка в editable-режиме"
-	@echo "  test        Все тесты"
-	@echo "  test-smoke  Smoke-тесты (e2e)"
-	@echo "  test-unit   Unit-тесты"
-	@echo "  test-integration  Интеграционные тесты"
-	@echo "  coverage    Отчёт о покрытии"
-	@echo "  lint        Линтинг и форматирование"
-	@echo "  build       Сборка Docker-образа"
-	@echo "  run         Запуск в Docker"
-	@echo "  shell       Интерактивный shell в контейнере"
-	@echo "  compose-up  Запуск compose-стека"
-	@echo "  compose-down  Остановка compose-стека"
-	@echo "  check       Полная проверка (lint + test)"
-	@echo "  clean       Очистка артефактов"
+	@printf '%s\n' \
+	  'setup              Подготовить локальное окружение' \
+	  'install            Установить app и core в editable-режиме' \
+	  'test               Все тесты' \
+	  'test-smoke         Smoke-тесты (e2e)' \
+	  'test-unit          Unit-тесты' \
+	  'test-integration   Интеграционные тесты' \
+	  'coverage           Отчёт о покрытии' \
+	  'lint               Линтинг и форматирование' \
+	  'build              Собрать Docker-образ' \
+	  'build-lib          Собрать переиспользуемый компонент' \
+	  'publish-lib        Опубликовать компонент в реестр' \
+	  'install-lib-local  Установить компонент локально' \
+	  'docs               Собрать документацию и диаграммы' \
+	  'run                Запустить приложение' \
+	  'shell              Интерактивный shell в контейнере' \
+	  'compose-up         Запустить compose-стек' \
+	  'compose-down       Остановить compose-стек' \
+	  'check              Полная проверка (lint + test + build-lib + docs)' \
+	  'clean              Очистить артефакты'
 
 setup:
-	python -m pip install --upgrade pip setuptools wheel
-	pip install -e ".[dev]"
+	./scripts/setup.sh
 
 install: setup
 
 test:
-	pytest -v --cov=src --cov-report=term-missing
+	./scripts/run-tests.sh
 
 test-smoke:
 	pytest tests/smoke -v -s
@@ -40,35 +44,47 @@ test-integration:
 	pytest tests/integration -v
 
 coverage:
-	pytest --cov=src --cov-report=html --cov-report=term
+	pytest --cov=src --cov=packages/core --cov-report=html --cov-report=term
 	@echo "Отчёт: htmlcov/index.html"
 
 lint:
-	ruff check src tests
-	ruff format src tests
+	ruff check src tests packages/core && ruff format src tests packages/core
 
 build:
 	docker build -t media-converter:latest .
 
+build-lib:
+	./scripts/build-component.sh
+
+publish-lib:
+	./scripts/publish-component.sh
+
+install-lib-local:
+	./scripts/install-component-local.sh
+
+docs:
+	./scripts/build-docs.sh
+
 run:
-	docker run --rm \
-		-v ./media:/app/media \
-		-v ./output:/app/output \
-		-v ./settings.toml:/app/settings.toml:ro \
-		media-converter:latest
+	./scripts/run-app.sh
 
 shell:
 	docker run -it --rm media-converter:latest bash
 
 compose-up:
-	docker-compose up --build -d
+	docker compose -f infra/compose.yaml up --build -d
 
 compose-down:
-	docker-compose down -v
+	docker compose -f infra/compose.yaml down -v
 
-check: lint test
+lock:
+	pip freeze > requirements.lock
+
+check: lint test build-lib docs
 	@echo "Полная проверка пройдена"
 
 clean:
 	rm -rf htmlcov/ .coverage .pytest_cache build/ dist/ *.egg-info
+	rm -rf packages/core/build packages/core/dist packages/core/*.egg-info
+	rm -rf docs/_generated/
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
