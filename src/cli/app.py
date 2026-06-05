@@ -154,12 +154,28 @@ def logs(tail: int = typer.Option(20, "--tail", "-n")):
 @app.command()
 def watch(interval: float = typer.Option(0.5, "--interval", help="Обновление UI (сек)")):
     """Интерактивный мониторинг (блокирует терминал)."""
-    proc = subprocess.Popen([sys.executable, "-m", "src.watcher"],
-                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    # Проверяем, запущен ли уже вотчер
+    if not PID_FILE.exists():
+        console.print("[yellow]Вотчер не запущен. Запустите: media-converter start[/yellow]")
+        raise typer.Exit(1)
+    
+    pid = int(PID_FILE.read_text().strip())
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        console.print("[red]PID мёртв. Очистите: media-converter stop[/red]")
+        raise typer.Exit(1)
+    
     state = StateManager()
     try:
         with Live(refresh_per_second=4, screen=True) as live:
-            while proc.poll() is None:
+            while True:
+                try:
+                    os.kill(pid, 0)  # проверяем, жив ли процесс
+                except ProcessLookupError:
+                    console.print("[yellow]Вотчер завершился[/yellow]")
+                    break
+                
                 data = state.get()
                 metrics = Table(show_header=False, box=None)
                 metrics.add_column(style="cyan")
@@ -184,15 +200,9 @@ def watch(interval: float = typer.Option(0.5, "--interval", help="Обновле
                 )
                 live.update(layout)
                 time.sleep(interval)
-        console.print(f"[yellow]Вотчер завершился (код {proc.returncode})[/yellow]")
     except KeyboardInterrupt:
         console.print("\n[yellow]Останавливаю...[/yellow]")
-        proc.send_signal(signal.SIGINT)
-        try:
-            proc.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-        console.print("[green]Остановлен[/green]")
+        console.print("[green]Используйте media-converter stop для остановки вотчера[/green]")
         
 if __name__ == "__main__":
     app()
