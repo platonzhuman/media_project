@@ -27,12 +27,12 @@ help:
 	  'clean              Очистить артефакты'
 
 setup:
-	./scripts/setup.sh
+	bash ./scripts/setup.sh
 
 install: setup
 
 test:
-	./scripts/run-tests.sh
+	bash ./scripts/run-tests.sh
 
 test-smoke:
 	pytest tests/smoke -v -s
@@ -54,19 +54,19 @@ build:
 	docker build -t media-converter:latest .
 
 build-lib:
-	./scripts/build-component.sh
+	bash ./scripts/build-component.sh
 
 publish-lib:
-	./scripts/publish-component.sh
+	bash ./scripts/publish-component.sh
 
 install-lib-local:
-	./scripts/install-component-local.sh
+	bash ./scripts/install-component-local.sh
 
 docs:
-	./scripts/build-docs.sh
+	bash ./scripts/build-docs.sh
 
 run:
-	./scripts/run-app.sh
+	bash ./scripts/run-app.sh
 
 shell:
 	docker run -it --rm media-converter:latest bash
