@@ -2,77 +2,71 @@
 
 ## Обзор
 
-Локальный сервис для автоматической конвертации медиафайлов в web-оптимальные форматы. Состоит из трёх слоёв: ядро обработки, CLI-интерфейс и инфраструктура сборки.
+Локальный микросервис для автоматической конвертации медиафайлов в web-оптимальные форматы. Сервис мониторит указанные директории, обнаруживает новые или изменённые файлы изображений и видео, конвертирует их в современные форматы (WebP, AVIF для изображений; H.264 MP4 для видео) с настраиваемым качеством, ведёт атомарное хранилище метрик и предоставляет CLI-интерфейс для управления и мониторинга.
 
 ## Поток данных
 
 ```
 [Файловая система]
       ↓
-[watchdog] → on_created / on_modified
+[watchdog Observer] → on_created / on_modified
       ↓
-[mediawatcher] → определяет тип (image/video)
+[MediaHandler] → определяет тип (image/video) по расширению
       ↓
-[ImageProcessor / VideoProcessor] → конвертация
+[ImageProcessor / VideoProcessor] → конвертация в целевые форматы
       ↓
-[atomic_replace] → атомарная запись в output/
+[atomic_replace] → атомарная запись результата в output/
       ↓
-[StateManager] → обновление метрик
+[StateManager] → обновление метрик (total_processed, saved_bytes, history)
       ↓
-[CLI: stats / watch] → чтение state + отображение
+[JSON Logger] → структурированные логи в stdout
+      ↓
+[CLI: stats / watch / status / logs] → чтение state + отображение через Rich
 ```
 
 ## Модули
 
-| Модуль | Ответственный | Назначение |
-|--------|---------------|------------|
-| `src/config.py` | Платон | Pydantic-модель `Settings`, валидация путей, защита от зацикливания |
-| `src/watcher.py` | Платон | `mediawatcher` + `mediahandler` на watchdog, graceful shutdown |
-| `src/processors/images.py` | Платон | WebP/AVIF через Pillow, многопоточность ThreadPoolExecutor |
-| `src/processors/video.py` | Платон | H.264 через ffmpeg, очистка метаданных |
-| `src/processors/utils.py` | Платон | `atomic_replace` — безопасная замена через временный файл |
-| `src/processors/base.py` | Платон | `safe_process` — обёртка обработки ошибок |
-| `src/state.py` | Никита | `StateManager` — thread-safe JSON-хранилище метрик |
-| `src/logger.py` | Никита | JSON-форматтер, `get_logger(name)` для всех модулей |
-| `src/cli/app.py` | Никита | Typer + Rich: start, stop, status, stats, config, logs, watch |
-| `pyproject.toml` | Даня | Зависимости, entry-point `media-converter` |
-| `Dockerfile` | Даня | Мульти-стейдж: builder + runtime с ffmpeg/libaom |
-| `docker-compose.yml` | Даня | Volumes: media, output, settings.toml, logs |
-| `Makefile` | Даня | install, test, lint, build, run, shell, coverage, ci |
-| `tests/` | Даня | pytest: config, watcher, processors, e2e, load, state, cli |
+| Модуль | Назначение | Публичный интерфейс |
+|--------|-----------|---------------------|
+| `src/config.py` | Pydantic-модель Settings, валидация путей, защита от зацикливания | `load_settings() → Settings` |
+| `src/watcher.py` | MediaWatcher + MediaHandler на базе watchdog, оркестрация обработки | `MediaWatcher.start()`, `MediaWatcher.stop()` |
+| `src/processors/images.py` | WebP/AVIF через Pillow, ThreadPoolExecutor для параллельных форматов | `ImageProcessor.process(src, out_dir) → dict` |
+| `src/processors/video.py` | H.264 через ffmpeg, очистка метаданных, оптимизация для web | `VideoProcessor.process(src, out_dir) → dict` |
+| `src/processors/utils.py` | atomic_replace — безопасная атомарная замена файла | `atomic_replace(src, dst)` |
+| `src/processors/base.py` | safe_process — обёртка ошибок для процессоров | `safe_process(processor_fn, src, out) → dict \| None` |
+| `src/state.py` | StateManager — thread-safe JSON-хранилище метрик с ротацией истории | `get()`, `update()`, `reset()` |
+| `src/logger.py` | JSON-форматтер, фабрика логгеров | `get_logger(name) → logging.Logger` |
+| `src/cli/app.py` | Typer + Rich: start, stop, status, stats, config, logs, watch | `typer.Typer` приложение |
 
-## Контракты между модулями
+## Контракты
 
 ### StateManager ↔ Processors
 
-`StateManager.update()` принимает `job_result` — dict с обязательными ключами:
+`StateManager.update()` принимает `job_result` — dict с ключами:
 - `output` (str): абсолютный путь к результату
 - `format` (str): целевой формат
-- `saved_bytes` (int): разница в байтах
+- `saved_bytes` (int): разница в байтах между оригиналом и результатом
 - `ratio` (float): процент сжатия
 
-Processors вызывают `update()` после каждой успешной конвертации. CLI читает state через `StateManager.get()`.
+Дополнительные параметры:
+- `active_jobs` (int): текущее количество активных задач
+- `queue_size` (int): размер очереди на обработку
 
 ### Logger ↔ Все модули
 
-`get_logger(name)` возвращает `logging.Logger` с `JsonFormatter`. Логи пишутся в stdout как JSON-строки. CLI-команда `logs` читает файл, если он перенаправлен (`output_dir/converter.log`).
+`get_logger(name)` возвращает `logging.Logger` с `JsonFormatter`. Логи направляются в stdout в формате JSON с полями: `timestamp`, `level`, `logger`, `message`.
 
 ### Config ↔ Watcher
 
-`load_settings()` читает `settings.toml` через Pydantic. Валидаторы:
-- `watch_dirs` — создают папки, проверяют права R+W
-- `output_dir` — запрещают вложенность в `watch_dirs`
+`load_settings()` читает `settings.toml`. Валидаторы проверяют:
+- права доступа (R_OK | W_OK) для watch_dirs
+- output_dir не находится внутри watch_dirs (защита от зацикливания)
+- диапазоны числовых параметров (quality: 1-100, crf: 0-51, max_workers: ≥1)
 
-## Границы ответственности
+### ImageProcessor ↔ ThreadPoolExecutor
 
-- **Платон** не знает про CLI и Docker. Его код запускается как `python -m src.watcher` или через CLI-команду `start`.
-- **Никита** не меняет логику конвертации. CLI управляет процессом вотчера и отображает метрики.
-- **Даня** не пишет бизнес-логику. Его тесты проверяют контракты между модулями.
+Конструктор принимает `quality` и `formats`. Метод `process()` запускает конвертацию в каждый формат параллельно через ThreadPoolExecutor. Метод `shutdown()` освобождает пул потоков.
 
-## Очередность сборки
+### VideoProcessor ↔ ffmpeg
 
-1. `feature/backend` (Платон) — ядро, валидация, процессоры
-2. `feature/docker` (Даня) — тесты, CI, Docker
-3. `feature/cli-state` (Никита) — CLI, документация
-
-Причина: CLI зависит от `logger.py` и `state.py`, тесты Дани зависят от валидаторов Платона.
+Конструктор принимает `codec` и `crf`. Метод `process()` формирует команду ffmpeg с параметрами: `-c:v codec`, `-crf`, `-preset fast`, `-movflags +faststart`, `-an` (без аудио), `-map_metadata -1` (очистка метаданных).

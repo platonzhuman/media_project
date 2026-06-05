@@ -1,0 +1,8 @@
+flowchart LR
+    User[Администратор]
+    FS[("Файловая система")]
+    MC[media-converter]
+
+    User -->|CLI команды| MC
+    User -->|копирует файлы| FS
+    MC <-->|читает/пишет| FS

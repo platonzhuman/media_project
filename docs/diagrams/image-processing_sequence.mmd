@@ -1,0 +1,31 @@
+sequenceDiagram
+    actor User as Администратор
+    participant FS as Файловая система
+    participant Watcher as MediaWatcher
+    participant Handler as MediaHandler
+    participant ImgProc as ImageProcessor
+    participant Utils as atomic_replace
+    participant State as StateManager
+
+    User->>FS: Копирует photo.jpg в watch_dir
+    FS->>Watcher: Событие on_created
+    Watcher->>Handler: on_created(event)
+    Handler->>Handler: Определение типа (image)
+    Handler->>ImgProc: process(photo.jpg, output_dir)
+
+    ImgProc->>ImgProc: _convert → WebP
+    ImgProc->>Utils: atomic_replace(tmp, photo.webp)
+    Utils->>FS: Запись photo.webp
+
+    opt Параллельно: AVIF (если включён в конфиге)
+        ImgProc->>ImgProc: _convert → AVIF
+        alt AVIF ошибка
+            ImgProc->>ImgProc: Fallback на WebP
+        end
+        ImgProc->>Utils: atomic_replace(tmp, photo.avif)
+        Utils->>FS: Запись photo.avif
+    end
+
+    ImgProc-->>Handler: results {webp, [avif]}
+    Handler->>State: update(job_result=..., active_jobs=1)
+    State->>State: Атомарная запись state.json

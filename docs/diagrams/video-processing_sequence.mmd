@@ -1,0 +1,29 @@
+sequenceDiagram
+    actor User as Администратор
+    participant FS as Файловая система
+    participant Watcher as MediaWatcher
+    participant Handler as MediaHandler
+    participant VidProc as VideoProcessor
+    participant Utils as atomic_replace
+    participant State as StateManager
+
+    User->>FS: Копирует video.mp4 в watch_dir
+    FS->>Watcher: Событие on_created
+    Watcher->>Handler: on_created(event)
+    Handler->>Handler: Определение типа (video)
+    Handler->>VidProc: process(video.mp4, output_dir)
+
+    VidProc->>VidProc: ffmpeg -an -map_metadata -1
+    Note over VidProc: Удаление аудио и метаданных
+
+    alt Конвертация успешна
+        VidProc->>Utils: atomic_replace(tmp, video.mp4)
+        Utils->>FS: Запись сжатого video.mp4
+        VidProc-->>Handler: results {mp4, ffmpeg_log}
+        Handler->>State: update(job_result=..., active_jobs=1)
+        State->>State: Атомарная запись state.json
+    else Ошибка ffmpeg
+        VidProc-->>Handler: exception
+        Handler->>Handler: logger.error(...)
+        Note over Handler: Файл удалён из _processed,<br/>повторная обработка возможна<br/>при новом событии
+    end

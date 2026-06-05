@@ -1,0 +1,11 @@
+stateDiagram-v2
+    [*] --> Detected: Файл обнаружен<br/>(событие ФС)
+    Detected --> Validating: Проверка типа<br/>(watcher.py)
+    Validating --> Rejected: Неподдерживаемый формат
+    Rejected --> [*]: Логирование<br/>и игнорирование
+    Validating --> Queued: Формат поддерживается
+    Queued --> Processing: Начало конвертации<br/>(handler вызывает processor)
+    Processing --> Completed: Успешное завершение
+    Processing --> Failed: Ошибка конвертации<br/>(Exception в processor)
+    Completed --> [*]: Обновление state.json,<br/>метрик и логов
+    Failed --> [*]: Логирование ошибки,<br/>удаление из _processed

@@ -1,0 +1,20 @@
+@startuml
+left to right direction
+actor Администратор as Admin
+
+rectangle "media-converter" {
+  usecase "UC1: Настроить конфигурацию" as UC1
+  usecase "UC2: Запустить фоновый мониторинг" as UC2
+  usecase "UC3: Остановить мониторинг" as UC3
+  usecase "UC4: Просмотреть статус активных задач" as UC4
+  usecase "UC5: Просмотреть статистику конвертации" as UC5
+  usecase "UC6: Просмотреть журнал операций" as UC6
+}
+
+Admin --> UC1
+Admin --> UC2
+Admin --> UC3
+Admin --> UC4
+Admin --> UC5
+Admin --> UC6
+@enduml
