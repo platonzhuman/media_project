@@ -3,14 +3,26 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, field_validator
 import os
 
+from media_converter_core import validate_quality, validate_crf
+
 # vnutr models
 class _CompressionImage(BaseSettings):
     quality: int = Field(default=85, ge=1, le=100)
     formats: list[str] = Field(default=["webp", "avif"])
 
+    @field_validator("quality")
+    @classmethod
+    def _check_quality(cls, v: int) -> int:
+        return validate_quality(v)
+
 class _CompressionVideo(BaseSettings):
     codec: str = Field(default="libx264")
     crf: int = Field(default=23, ge=0, le=51)
+
+    @field_validator("crf")
+    @classmethod
+    def _check_crf(cls, v: int) -> int:
+        return validate_crf(v)
 
 class _Workers(BaseSettings):
     max_workers: int = Field(default=4, ge=1)
