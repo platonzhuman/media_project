@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "media-converter-core"
+version = "1.0.0"
+description = "Core media conversion logic"
+requires-python = ">=3.11"
+dependencies = [
+    "pillow>=10.2.0",
+    "pillow-avif-plugin>=1.4.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["media_converter_core*"]
