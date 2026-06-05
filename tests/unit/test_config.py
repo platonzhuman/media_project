@@ -47,12 +47,12 @@ def test_video_processor_bad_file_raises(tmp_path, monkeypatch):
 
 
 def test_validate_quality_out_of_range():
-    from packages.core.media_converter_core import validate_quality
+    from media_converter_core import validate_quality
     with pytest.raises(ValueError):
         validate_quality(999)
 
 
 def test_validate_crf_out_of_range():
-    from packages.core.media_converter_core import validate_crf
+    from media_converter_core import validate_crf
     with pytest.raises(ValueError):
         validate_crf(-1)
