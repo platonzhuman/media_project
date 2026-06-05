@@ -2,7 +2,7 @@ import threading
 import time
 from pathlib import Path
 from PIL import Image
-from src.watcher import mediawatcher
+from src.watcher import MediaWatcher
 from src.config import Settings
 
 
@@ -12,7 +12,7 @@ def test_full_image_pipeline(tmp_path: Path, monkeypatch):
     out.mkdir()
     Image.new("RGB", (50, 50), "blue").save(media / "e2e.jpg", "JPEG")
     monkeypatch.setattr("signal.signal", lambda *args, **kwargs: None)
-    watcher = mediawatcher(Settings(watch_dirs=[media], output_dir=out))
+    watcher = MediaWatcher(Settings(watch_dirs=[media], output_dir=out))
     t = threading.Thread(target=watcher.start, daemon=True)
     t.start()
     time.sleep(0.3)
