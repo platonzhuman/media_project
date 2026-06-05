@@ -24,7 +24,7 @@
 [CLI: stats / watch / status / logs] → чтение state + отображение через Rich
 ```
 
-## Модули
+## Модули приложения (src/)
 
 | Модуль | Назначение | Публичный интерфейс |
 |--------|-----------|---------------------|
@@ -37,6 +37,22 @@
 | `src/state.py` | StateManager — thread-safe JSON-хранилище метрик с ротацией истории | `get()`, `update()`, `reset()` |
 | `src/logger.py` | JSON-форматтер, фабрика логгеров | `get_logger(name) → logging.Logger` |
 | `src/cli/app.py` | Typer + Rich: start, stop, status, stats, config, logs, watch | `typer.Typer` приложение |
+
+## Переиспользуемый компонент (packages/core)
+
+`packages/core/media_converter_core/` — отдельный pip-пакет с чистой логикой конвертации.
+Не знает про `src/`, watchdog, typer, rich. Принимает `bytes`, возвращает `bytes`.
+Устанавливается независимо от приложения: `pip install media-converter-core`.
+
+| Модуль | Назначение | Публичный интерфейс |
+|--------|-----------|---------------------|
+| `media_converter_core/models.py` | Dataclass-контракты | `ConversionResult`, `MediaFile` |
+| `media_converter_core/conversion.py` | Чистые функции конвертации bytes→bytes | `convert_image()`, `convert_video()`, `calculate_metrics()` |
+| `media_converter_core/validation.py` | Валидация доменных параметров | `validate_quality()`, `validate_crf()`, `validate_paths()` |
+
+**Граница между app и core:** `src/config.py` импортирует `validate_quality` и `validate_crf`
+из `media_converter_core` как `@field_validator`. Это единственная точка использования core в `src/`.
+Направление зависимости строго одностороннее: `src/ → media_converter_core`, но не наоборот.
 
 ## Контракты
 
@@ -62,6 +78,12 @@
 - права доступа (R_OK | W_OK) для watch_dirs
 - output_dir не находится внутри watch_dirs (защита от зацикливания)
 - диапазоны числовых параметров (quality: 1-100, crf: 0-51, max_workers: ≥1)
+
+### Config ↔ media-converter-core
+
+`src/config.py` использует `validate_quality` и `validate_crf` из `media_converter_core`
+как `@field_validator` в Pydantic-моделях. Это гарантирует, что доменные правила
+применяются при загрузке настроек и core остаётся единственным источником правил валидации.
 
 ### ImageProcessor ↔ ThreadPoolExecutor
 
