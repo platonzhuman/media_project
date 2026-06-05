@@ -9,4 +9,9 @@ services:
       - ./logs:/app/logs
     environment:
       - PYTHONUNBUFFERED=1
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
     restart: unless-stopped
