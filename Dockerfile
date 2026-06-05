@@ -24,4 +24,7 @@ COPY . .
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD python -c "from src.config import load_settings; load_settings(); exit(0)" || exit 1
+
 CMD ["python", "-m", "src.watcher"]
