@@ -1,5 +1,6 @@
 from pathlib import Path
 import pytest
+from pydantic import ValidationError
 from src.config import Settings, load_settings
 
 
@@ -16,5 +17,6 @@ def test_watch_dirs_resolve():
 
 
 def test_invalid_quality():
-    with pytest.raises(ValueError):
-        Settings(image_quality=101)
+    with pytest.raises((ValueError, ValidationError)):
+        Settings(compression_image={"quality": 101}) 
+
