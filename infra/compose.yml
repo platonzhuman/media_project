@@ -1,12 +1,14 @@
 services:
   converter:
-    build: .
+    build:
+      context: ..
+      dockerfile: Dockerfile
     container_name: media_converter
     volumes:
-      - ./media:/app/media
-      - ./output:/app/output
-      - ./settings.toml:/app/settings.toml:ro
-      - ./logs:/app/logs
+      - ../media:/app/media
+      - ../output:/app/output
+      - ../settings.toml:/app/settings.toml:ro
+      - ../logs:/app/logs
     environment:
       - PYTHONUNBUFFERED=1
     healthcheck:

@@ -72,10 +72,10 @@ shell:
 	docker run -it --rm media-converter:latest bash
 
 compose-up:
-	docker compose -f infra/compose.yaml up --build -d
+	docker compose -f infra/compose.yml up --build -d
 
 compose-down:
-	docker compose -f infra/compose.yaml down -v
+	docker compose -f infra/compose.yml down -v
 
 lock:
 	pip freeze > requirements.lock

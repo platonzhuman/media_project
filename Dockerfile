@@ -7,6 +7,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 COPY pyproject.toml .
+ENV PIP_INDEX_URL=https://pypi.org/simple/
+ENV PIP_EXTRA_INDEX_URL=https://test.pypi.org/simple/
 RUN pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir -e .
 
 #собираем финальный образ
@@ -27,4 +29,4 @@ ENV PYTHONUNBUFFERED=1
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
     CMD python -c "from src.config import load_settings; load_settings(); exit(0)" || exit 1
 
-CMD ["python", "-m", "src.watcher"]
+CMD ["python", "-m", "src.watcher"] 
