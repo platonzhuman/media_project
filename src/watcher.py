@@ -1,13 +1,12 @@
-from pathlib import Path # paths file
-from watchdog.events import FileSystemEventHandler, FileCreatedEvent # sobutia files
+from pathlib import Path
+from watchdog.events import FileSystemEventHandler
 from threading import Lock
 
-import signal # system signal
-import sys # for outpute process
+import signal
+import sys
 import threading
-
-import time # pause range
-from watchdog.observers import Observer # start watcher
+import time
+from watchdog.observers import Observer
 
 from src.config import Settings, load_settings
 from src.state import StateManager
@@ -21,15 +20,12 @@ logger = get_logger("watcher")
 class MediaHandler(FileSystemEventHandler):
     def __init__(self, settings: Settings):
         self.settings = settings
-        # list formats obrabotka
-        self.supported_images = {".jpg", ".jpeg", ".png"}
+        self.supported_images = {".jpg", ".png"}
         self.supported_video = {".mp4", ".mov"}
-        #  now sostoyanie sistem
         self._state = StateManager()
-        self._processed = set()   
+        self._processed = set()
         self._lock = Lock()
 
-        # added real proccerors 
         self.image_processor = ImageProcessor(
             quality=settings.image_quality,
             formats=settings.image_formats,
@@ -40,33 +36,66 @@ class MediaHandler(FileSystemEventHandler):
         )
 
     def on_created(self, event):
-        # reaction on file only
         if not event.is_directory:
-            self._process(event.src_path)
-    
+            self._schedule(event.src_path)
+
     def on_modified(self, event):
         if not event.is_directory:
-            with self._lock:
-                if event.src_path not in self._processed:
-                    self._processed.add(event.src_path)
-                    # started obr in another potok
-                    threading.Timer(0.5, lambda: self._process(event.src_path)).start()
+            self._schedule(event.src_path)
+
+    def _schedule(self, path: str):
+        with self._lock:
+            if path in self._processed:
+                return
+            self._processed.add(path)
+        # Запускаем обработку в отдельном потоке с задержкой
+        threading.Thread(target=self._delayed_process, args=(path,), daemon=True).start()
+
+    def _delayed_process(self, path: str):
+        ext = Path(path).suffix.lower()
+        # Для видео ждём, пока файл "стабилизируется" (не растёт в размере)
+        if ext in self.supported_video:
+            if not self._wait_for_stable(path, timeout=30, interval=0.5):
+                logger.warning(f"Файл не стабилизировался, пропускаю: {path}")
+                with self._lock:
+                    self._processed.discard(path)
+                return
+        else:
+            time.sleep(0.3)  # небольшая задержка для изображений
+
+        self._process(path)
+
+    def _wait_for_stable(self, path: str, timeout: float = 30, interval: float = 0.5) -> bool:
+        """Ждём, пока размер файла не перестанет меняться."""
+        start = time.time()
+        last_size = -1
+        stable_count = 0
+        while time.time() - start < timeout:
+            try:
+                current_size = Path(path).stat().st_size
+            except (OSError, FileNotFoundError):
+                return False
+            if current_size == last_size and current_size > 0:
+                stable_count += 1
+                if stable_count >= 3:  # 3 проверки подряд (~1.5 сек)
+                    return True
+            else:
+                stable_count = 0
+                last_size = current_size
+            time.sleep(interval)
+        return False
 
     def _process(self, path: str):
         ext = Path(path).suffix.lower()
         if ext not in self.supported_images and ext not in self.supported_video:
-            # safe delete path 
             with self._lock:
                 self._processed.discard(path)
             return
-        
+
         try:
-            # added connect real functional for proceccing
             if ext in self.supported_images:
                 res = self.image_processor.process(Path(path), self.settings.output_dir)
-                # because we have slovar
                 first = next(iter(res.values()))
-                # replace result and sostoyanie in real time
                 self._state.update(job_result=first, active_jobs=1, queue_size=0)
                 logger.info(f"Изображение обработано: {first['output']}")
             elif ext in self.supported_video:
@@ -74,18 +103,15 @@ class MediaHandler(FileSystemEventHandler):
                 self._state.update(job_result=res, active_jobs=1, queue_size=0)
                 logger.info(f"Видео обработано: {res['output']}")
         except Exception as e:
-            # log error 
-            logger.error(f"oшибка обработки {path}: {e}")
+            logger.error(f"Ошибка обработки {path}: {e}")
         finally:
-            # delete path
             with self._lock:
                 self._processed.discard(path)
 
-    
     def shutdown(self):
         self.image_processor.shutdown()
 
-# create class for slezki and vovrema stoped 
+
 class MediaWatcher:
     def __init__(self, settings: Settings):
         self.settings = settings
@@ -121,5 +147,12 @@ class MediaWatcher:
 if __name__ == "__main__":
     from src.config import load_settings
     settings = load_settings()
+    log_file = settings.output_dir / "converter.log"
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+    import logging
+    from src.logger import JsonFormatter
+    fh = logging.FileHandler(log_file, encoding="utf-8")
+    fh.setFormatter(JsonFormatter())
+    logger.addHandler(fh)
     watcher = MediaWatcher(settings)
     watcher.start()

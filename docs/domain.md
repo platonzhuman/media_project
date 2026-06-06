@@ -14,7 +14,9 @@
 
 Задача конвертации видео. Параметры: исходный файл, кодек, CRF. Результат: `ConversionResult` с дополнительным полем `ffmpeg_log`.
 
-### ConversionResult
+### ConversionResult (dict — возвращается процессорами src/)
+
+Результат конвертации файла с диска. Используется внутри приложения для обновления StateManager.
 
 ```python
 {
@@ -24,6 +26,21 @@
     "saved_bytes": int,      # экономия в байтах
     "ratio": float,          # процент сжатия
 }
+```
+
+### ConversionResult (dataclass — из media_converter_core)
+
+Результат чистой конвертации bytes → bytes. Используется в переиспользуемом пакете `media-converter-core`, не привязан к файловой системе.
+
+```python
+@dataclass
+class ConversionResult:
+    output_bytes: bytes    # готовый файл в памяти
+    original_size: int     # размер входных данных
+    output_size: int       # размер результата
+    format: str            # "webp", "avif", "mp4"
+    saved_bytes: int       # original_size - output_size
+    ratio: float           # процент сжатия
 ```
 
 ### SystemState
@@ -72,6 +89,9 @@
 ### DR-6. Graceful shutdown
 При получении сигнала SIGTERM или SIGINT система останавливает Observer, освобождает ThreadPoolExecutor и завершает процесс с кодом 0.
 
+### DR-7. Валидация параметров
+`validate_quality` (1–100) и `validate_crf` (0–51) из `media_converter_core` применяются как `@field_validator` в Pydantic-моделях конфигурации. Нарушение диапазона — `ValueError` при старте.
+
 ## Сценарии использования
 
 ### UC-1. Запуск фонового мониторинга
@@ -95,8 +115,9 @@
 3. Rich отображает таблицу с метриками и последними файлами
 
 ### UC-4. Интерактивный мониторинг
-1. Пользователь выполняет `media-converter watch`
-2. CLI запускает watcher в subprocess
-3. Rich Live обновляет дашборд каждые 0.5 сек
-4. Пользователь нажимает Ctrl+C
-5. CLI отправляет SIGINT subprocess и завершается
+1. Пользователь предварительно запустил `media-converter start`
+2. Пользователь выполняет `media-converter watch`
+3. CLI читает PID из `/tmp/media_converter.pid` и проверяет, что процесс жив (`os.kill(pid, 0)`)
+4. Rich Live обновляет дашборд каждые 0.5 сек: метрики и последние 5 файлов из истории
+5. Если PID умер — дашборд сообщает об этом и завершает работу
+6. Пользователь нажимает Ctrl+C — дашборд останавливается, вотчер продолжает работать в фоне
